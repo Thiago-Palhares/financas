@@ -1,8 +1,8 @@
-const STORAGE_KEYS = {
-  users: "financas-ai-users",
-  session: "financas-ai-session",
-  theme: "financas-ai-theme",
-  transactionsPrefix: "financas-ai-transactions:",
+﻿const STORAGE_KEYS = {
+  users: "financas-users",
+  session: "financas-session",
+  theme: "financas-theme",
+  transactionsPrefix: "financas-transactions:",
 };
 
 const DEMO_USER = {
@@ -170,7 +170,7 @@ function bindEvents() {
 }
 
 function initializeCloudClient() {
-  const config = window.FINANCAS_AI_SUPABASE;
+  const config = window.FINANCAS_SUPABASE;
   const hasConfig =
     config?.url?.startsWith("https://") &&
     config?.anonKey &&
@@ -524,7 +524,7 @@ function activateTab(tabName) {
     panel.classList.toggle("active", panel.id === `${tabName}-panel`);
   });
 
-  elements.pageTitle.textContent = titles[tabName] || "Finanças AI";
+  elements.pageTitle.textContent = titles[tabName] || "Finanças";
 }
 
 function renderAll() {
@@ -717,7 +717,7 @@ function exportCsv() {
   const downloadUrl = URL.createObjectURL(blob);
   const downloadLink = document.createElement("a");
   downloadLink.href = downloadUrl;
-  downloadLink.download = `extrato-financas-ai-${getDateWithOffset(0)}.csv`;
+  downloadLink.download = `extrato-financas-${getDateWithOffset(0)}.csv`;
   downloadLink.click();
   URL.revokeObjectURL(downloadUrl);
 }

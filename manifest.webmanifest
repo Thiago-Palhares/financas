@@ -1,6 +1,6 @@
-{
-  "name": "Finanças AI",
-  "short_name": "Finanças AI",
+﻿{
+  "name": "Finanças",
+  "short_name": "Finanças",
   "description": "Dashboard simples para administrar saldo, extrato e gastos futuros.",
   "start_url": "./index.html",
   "display": "standalone",
