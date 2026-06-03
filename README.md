@@ -35,6 +35,35 @@ O GitHub vai gerar um link parecido com:
 
 `https://seu-usuario.github.io/financas-ai/`
 
+## Como ativar sincronização com Supabase
+
+Hoje o app funciona em dois modos:
+
+- Sem Supabase configurado: salva no navegador atual com `localStorage`.
+- Com Supabase configurado: usa login real e salva os lançamentos na nuvem.
+
+Para ativar a sincronização entre computador e celular:
+
+1. Crie um projeto em `https://supabase.com`.
+2. No Supabase, abra `SQL Editor`.
+3. Cole e execute o conteúdo do arquivo `supabase-schema.sql`.
+4. Vá em `Project Settings` > `API`.
+5. Copie a `Project URL`.
+6. Copie a chave pública `anon`.
+7. Abra o arquivo `supabase-config.js`.
+8. Preencha assim:
+
+```js
+window.FINANCAS_AI_SUPABASE = {
+  url: "https://SEU-PROJETO.supabase.co",
+  anonKey: "SUA_CHAVE_ANON_PUBLICA",
+};
+```
+
+9. Salve, faça commit e envie para o GitHub.
+
+Importante: use apenas a chave pública `anon`. Nunca coloque `service_role` no site.
+
 Conta demo:
 
 - Usuário: `thiago@financas.ai`
@@ -43,6 +72,7 @@ Conta demo:
 ## O que já tem
 
 - Login com usuário e senha local.
+- Login real com Supabase quando configurado.
 - Criação de conta local no próprio navegador.
 - Layout responsivo para computador e celular.
 - Tema escuro com detalhes em roxo e alternância para tema claro.
@@ -51,7 +81,8 @@ Conta demo:
 - Cadastro de gastos já realizados ou futuros.
 - Cadastro de entradas para compor o saldo.
 - Exportação do extrato em CSV.
+- Sincronização entre dispositivos via Supabase.
 
 ## Observação importante
 
-Esta primeira versão salva os dados no `localStorage` do navegador. É ótima para protótipo e estudo, mas ainda não é autenticação segura de produção. O próximo passo natural é criar um backend com banco de dados e senha criptografada.
+Sem Supabase configurado, os dados continuam salvos no `localStorage` do navegador. Com Supabase configurado, os dados passam a ser salvos na nuvem com regras de segurança por usuário.

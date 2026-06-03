@@ -73,10 +73,13 @@ const elements = {
   authFeedback: document.querySelector("#auth-feedback"),
   createAccountButton: document.querySelector("#create-account-button"),
   useDemoButton: document.querySelector("#use-demo-button"),
+  demoAccess: document.querySelector(".demo-access"),
+  authDescription: document.querySelector(".auth-card .muted"),
   currentUserLabel: document.querySelector("#current-user-label"),
   logoutButton: document.querySelector("#logout-button"),
   exportButton: document.querySelector("#export-button"),
   themeToggleButton: document.querySelector("#theme-toggle-button"),
+  syncStatus: document.querySelector("#sync-status"),
   pageTitle: document.querySelector("#page-title"),
   navTabs: document.querySelectorAll(".nav-tab"),
   panels: document.querySelectorAll(".tab-panel"),
@@ -106,13 +109,30 @@ const elements = {
 
 let currentUser = null;
 let transactions = [];
+let storageMode = "local";
+let cloudClient = null;
 
 initializeApp();
 
-function initializeApp() {
+async function initializeApp() {
   applySavedTheme();
+  initializeCloudClient();
+  updateStorageModeCopy();
   ensureDemoUser();
   elements.transactionDate.value = getDateWithOffset(0);
+  bindEvents();
+
+  if (isCloudMode()) {
+    const cloudSession = await getCloudSession();
+    if (cloudSession?.user) {
+      currentUser = getCloudUser(cloudSession.user);
+      await showFinanceApp();
+      return;
+    }
+
+    showAuthScreen();
+    return;
+  }
 
   const savedSession = localStorage.getItem(STORAGE_KEYS.session);
   if (savedSession) {
@@ -120,10 +140,8 @@ function initializeApp() {
     currentUser = users.find((user) => user.username === savedSession) || null;
   }
 
-  bindEvents();
-
   if (currentUser) {
-    showFinanceApp();
+    await showFinanceApp();
   } else {
     showAuthScreen();
   }
@@ -151,6 +169,68 @@ function bindEvents() {
   elements.transactionsTable.addEventListener("click", handleTableAction);
 }
 
+function initializeCloudClient() {
+  const config = window.FINANCAS_AI_SUPABASE;
+  const hasConfig =
+    config?.url?.startsWith("https://") &&
+    config?.anonKey &&
+    !config.anonKey.includes("SUA_CHAVE") &&
+    !config.url.includes("SEU-PROJETO");
+
+  if (!hasConfig || !window.supabase?.createClient) {
+    storageMode = "local";
+    cloudClient = null;
+    return;
+  }
+
+  cloudClient = window.supabase.createClient(config.url, config.anonKey);
+  storageMode = "cloud";
+}
+
+function updateStorageModeCopy() {
+  if (isCloudMode()) {
+    elements.authDescription.textContent =
+      "Entre com seu e-mail e senha. Seus dados ficam sincronizados entre computador e celular.";
+    elements.createAccountButton.textContent = "Criar conta na nuvem";
+    elements.demoAccess.classList.add("hidden");
+    updateSyncStatus("Nuvem", "cloud");
+    return;
+  }
+
+  elements.authDescription.textContent =
+    "Modo local ativo. Configure o Supabase para sincronizar computador e celular.";
+  elements.createAccountButton.textContent = "Criar conta local";
+  elements.demoAccess.classList.remove("hidden");
+  updateSyncStatus("Local", "local");
+}
+
+function isCloudMode() {
+  return storageMode === "cloud" && Boolean(cloudClient);
+}
+
+function updateSyncStatus(label, mode = storageMode) {
+  if (!elements.syncStatus) {
+    return;
+  }
+
+  elements.syncStatus.textContent = label;
+  elements.syncStatus.dataset.mode = mode;
+}
+
+async function getCloudSession() {
+  if (!cloudClient) {
+    return null;
+  }
+
+  const { data, error } = await cloudClient.auth.getSession();
+  if (error) {
+    showAuthFeedback(error.message);
+    return null;
+  }
+
+  return data.session;
+}
+
 function applySavedTheme() {
   const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) || "dark";
   setTheme(savedTheme);
@@ -171,10 +251,16 @@ function setTheme(theme) {
   }
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
   const username = elements.loginUsername.value.trim().toLowerCase();
   const password = elements.loginPassword.value;
+
+  if (isCloudMode()) {
+    await handleCloudLogin(username, password);
+    return;
+  }
+
   const users = getUsers();
   const foundUser = users.find(
     (user) => user.username === username && user.password === password,
@@ -187,10 +273,30 @@ function handleLogin(event) {
 
   currentUser = foundUser;
   localStorage.setItem(STORAGE_KEYS.session, foundUser.username);
-  showFinanceApp();
+  await showFinanceApp();
 }
 
-function handleCreateAccount() {
+async function handleCloudLogin(email, password) {
+  setAuthLoading(true);
+  showAuthFeedback("");
+
+  const { data, error } = await cloudClient.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  setAuthLoading(false);
+
+  if (error) {
+    showAuthFeedback(getFriendlyAuthError(error.message));
+    return;
+  }
+
+  currentUser = getCloudUser(data.user);
+  await showFinanceApp();
+}
+
+async function handleCreateAccount() {
   const username = elements.loginUsername.value.trim().toLowerCase();
   const password = elements.loginPassword.value.trim();
 
@@ -199,8 +305,18 @@ function handleCreateAccount() {
     return;
   }
 
+  if (password.length < 6 && isCloudMode()) {
+    showAuthFeedback("Use uma senha com pelo menos 6 caracteres para a conta na nuvem.");
+    return;
+  }
+
   if (password.length < 4) {
     showAuthFeedback("Use uma senha com pelo menos 4 caracteres para este protótipo.");
+    return;
+  }
+
+  if (isCloudMode()) {
+    await handleCloudSignUp(username, password);
     return;
   }
 
@@ -223,7 +339,32 @@ function handleCreateAccount() {
   currentUser = newUser;
   localStorage.setItem(STORAGE_KEYS.session, newUser.username);
   initializeUserTransactions(newUser.username);
-  showFinanceApp();
+  await showFinanceApp();
+}
+
+async function handleCloudSignUp(email, password) {
+  setAuthLoading(true);
+  showAuthFeedback("");
+
+  const { data, error } = await cloudClient.auth.signUp({
+    email,
+    password,
+  });
+
+  setAuthLoading(false);
+
+  if (error) {
+    showAuthFeedback(getFriendlyAuthError(error.message));
+    return;
+  }
+
+  if (data.session?.user) {
+    currentUser = getCloudUser(data.session.user);
+    await showFinanceApp();
+    return;
+  }
+
+  showAuthFeedback("Conta criada. Confirme seu e-mail e depois faça login.");
 }
 
 function fillDemoCredentials() {
@@ -232,7 +373,11 @@ function fillDemoCredentials() {
   showAuthFeedback("");
 }
 
-function handleLogout() {
+async function handleLogout() {
+  if (isCloudMode()) {
+    await cloudClient.auth.signOut();
+  }
+
   currentUser = null;
   transactions = [];
   localStorage.removeItem(STORAGE_KEYS.session);
@@ -240,7 +385,7 @@ function handleLogout() {
   showAuthScreen();
 }
 
-function handleTransactionSubmit(event) {
+async function handleTransactionSubmit(event) {
   event.preventDefault();
 
   const amount = Number(elements.transactionAmount.value);
@@ -260,8 +405,21 @@ function handleTransactionSubmit(event) {
     notes: elements.transactionNotes.value.trim(),
   };
 
-  transactions.unshift(transaction);
-  saveTransactions();
+  elements.transactionFeedback.textContent = "Salvando...";
+
+  if (isCloudMode()) {
+    const savedTransaction = await createCloudTransaction(transaction);
+    if (!savedTransaction) {
+      return;
+    }
+
+    transactions.unshift(savedTransaction);
+    updateSyncStatus("Sincronizado", "cloud");
+  } else {
+    transactions.unshift(transaction);
+    saveLocalTransactions();
+  }
+
   elements.transactionForm.reset();
   elements.transactionDate.value = getDateWithOffset(0);
   elements.transactionFeedback.textContent = "Lançamento salvo com sucesso.";
@@ -271,7 +429,7 @@ function handleTransactionSubmit(event) {
   renderAll();
 }
 
-function handleTableAction(event) {
+async function handleTableAction(event) {
   const actionButton = event.target.closest("button[data-action]");
   if (!actionButton) {
     return;
@@ -279,31 +437,57 @@ function handleTableAction(event) {
 
   const transactionId = actionButton.dataset.id;
   const action = actionButton.dataset.action;
+  const selectedTransaction = transactions.find((item) => item.id === transactionId);
+
+  if (!selectedTransaction) {
+    return;
+  }
 
   if (action === "toggle-status") {
-    transactions = transactions.map((transaction) => {
-      if (transaction.id !== transactionId) {
-        return transaction;
+    const updatedTransaction = {
+      ...selectedTransaction,
+      status: selectedTransaction.status === "paid" ? "planned" : "paid",
+    };
+
+    if (isCloudMode()) {
+      const savedTransaction = await updateCloudTransaction(updatedTransaction);
+      if (!savedTransaction) {
+        return;
       }
 
-      return {
-        ...transaction,
-        status: transaction.status === "paid" ? "planned" : "paid",
-      };
-    });
+      transactions = transactions.map((transaction) =>
+        transaction.id === transactionId ? savedTransaction : transaction,
+      );
+      updateSyncStatus("Sincronizado", "cloud");
+    } else {
+      transactions = transactions.map((transaction) =>
+        transaction.id === transactionId ? updatedTransaction : transaction,
+      );
+      saveLocalTransactions();
+    }
   }
 
   if (action === "delete") {
-    const transaction = transactions.find((item) => item.id === transactionId);
-    const shouldDelete = window.confirm(`Remover "${transaction?.description || "lançamento"}"?`);
+    const shouldDelete = window.confirm(`Remover "${selectedTransaction.description || "lançamento"}"?`);
     if (!shouldDelete) {
       return;
     }
 
+    if (isCloudMode()) {
+      const deleted = await deleteCloudTransaction(transactionId);
+      if (!deleted) {
+        return;
+      }
+      updateSyncStatus("Sincronizado", "cloud");
+    }
+
     transactions = transactions.filter((item) => item.id !== transactionId);
+
+    if (!isCloudMode()) {
+      saveLocalTransactions();
+    }
   }
 
-  saveTransactions();
   renderAll();
 }
 
@@ -311,13 +495,16 @@ function showAuthScreen() {
   elements.financeApp.classList.add("hidden");
   elements.authScreen.classList.remove("hidden");
   showAuthFeedback("");
+  updateStorageModeCopy();
 }
 
-function showFinanceApp() {
+async function showFinanceApp() {
   elements.authScreen.classList.add("hidden");
   elements.financeApp.classList.remove("hidden");
   elements.currentUserLabel.textContent = currentUser.name;
-  transactions = getTransactions();
+  updateSyncStatus(isCloudMode() ? "Sincronizando..." : "Local", storageMode);
+  transactions = await getTransactions();
+  updateSyncStatus(isCloudMode() ? "Sincronizado" : "Local", storageMode);
   activateTab("dashboard");
   renderAll();
 }
@@ -565,13 +752,17 @@ function saveUsers(users) {
   localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
 }
 
-function getTransactions() {
+async function getTransactions() {
+  if (isCloudMode()) {
+    return loadCloudTransactions();
+  }
+
   initializeUserTransactions(currentUser.username);
   const savedTransactions = localStorage.getItem(getTransactionKey(currentUser.username));
   return savedTransactions ? JSON.parse(savedTransactions) : [];
 }
 
-function saveTransactions() {
+function saveLocalTransactions() {
   localStorage.setItem(getTransactionKey(currentUser.username), JSON.stringify(transactions));
 }
 
@@ -579,8 +770,123 @@ function getTransactionKey(username) {
   return `${STORAGE_KEYS.transactionsPrefix}${username}`;
 }
 
+async function loadCloudTransactions() {
+  const { data, error } = await cloudClient
+    .from("transactions")
+    .select("*")
+    .order("transaction_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    updateSyncStatus("Erro na nuvem", "error");
+    window.alert(`Não consegui carregar os dados da nuvem: ${error.message}`);
+    return [];
+  }
+
+  return data.map(fromCloudRow);
+}
+
+async function createCloudTransaction(transaction) {
+  const { data, error } = await cloudClient
+    .from("transactions")
+    .insert(toCloudPayload(transaction))
+    .select()
+    .single();
+
+  if (error) {
+    updateSyncStatus("Erro na nuvem", "error");
+    elements.transactionFeedback.textContent = `Erro ao salvar: ${error.message}`;
+    return null;
+  }
+
+  return fromCloudRow(data);
+}
+
+async function updateCloudTransaction(transaction) {
+  const { data, error } = await cloudClient
+    .from("transactions")
+    .update(toCloudPayload(transaction))
+    .eq("id", transaction.id)
+    .select()
+    .single();
+
+  if (error) {
+    updateSyncStatus("Erro na nuvem", "error");
+    window.alert(`Não consegui atualizar na nuvem: ${error.message}`);
+    return null;
+  }
+
+  return fromCloudRow(data);
+}
+
+async function deleteCloudTransaction(transactionId) {
+  const { error } = await cloudClient.from("transactions").delete().eq("id", transactionId);
+
+  if (error) {
+    updateSyncStatus("Erro na nuvem", "error");
+    window.alert(`Não consegui excluir da nuvem: ${error.message}`);
+    return false;
+  }
+
+  return true;
+}
+
+function toCloudPayload(transaction) {
+  return {
+    user_id: currentUser.id,
+    type: transaction.type,
+    status: transaction.status,
+    description: transaction.description,
+    amount: transaction.amount,
+    transaction_date: transaction.date,
+    category: transaction.category,
+    notes: transaction.notes || "",
+  };
+}
+
+function fromCloudRow(row) {
+  return {
+    id: row.id,
+    type: row.type,
+    status: row.status,
+    description: row.description,
+    amount: Number(row.amount),
+    date: row.transaction_date,
+    category: row.category,
+    notes: row.notes || "",
+  };
+}
+
+function getCloudUser(user) {
+  return {
+    id: user.id,
+    name: getDisplayName(user.email || "Usuário"),
+    username: user.email || user.id,
+  };
+}
+
+function setAuthLoading(isLoading) {
+  elements.authForm.querySelectorAll("button, input").forEach((element) => {
+    element.disabled = isLoading;
+  });
+}
+
 function showAuthFeedback(message) {
   elements.authFeedback.textContent = message;
+}
+
+function getFriendlyAuthError(message) {
+  const normalizedMessage = message.toLowerCase();
+
+  if (normalizedMessage.includes("invalid login")) {
+    return "E-mail ou senha inválidos.";
+  }
+
+  if (normalizedMessage.includes("email not confirmed")) {
+    return "Confirme seu e-mail antes de entrar.";
+  }
+
+  return message;
 }
 
 function getSignedAmount(transaction) {
