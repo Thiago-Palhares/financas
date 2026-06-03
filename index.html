@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#7e22ce" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Finanças AI" />
+    <title>Finanças AI</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="auth-screen" id="auth-screen">
+        <div class="auth-hero" aria-hidden="true">
+          <div class="brand-mark">FA</div>
+          <p class="eyebrow">Controle financeiro pessoal</p>
+          <h1>Seu dinheiro, compromissos e próximos gastos em uma visão clara.</h1>
+          <div class="hero-card">
+            <span>Saldo projetado</span>
+            <strong id="hero-projected-balance">R$ 8.420,00</strong>
+            <small>Inclui gastos futuros cadastrados</small>
+          </div>
+        </div>
+
+        <form class="auth-card" id="auth-form">
+          <div>
+            <p class="eyebrow">Entrar</p>
+            <h2>Acesse sua conta</h2>
+            <p class="muted">
+              Use a conta demo ou crie seu próprio usuário local neste navegador.
+            </p>
+          </div>
+
+          <label>
+            Usuário ou e-mail
+            <input
+              id="login-username"
+              name="username"
+              type="text"
+              autocomplete="username"
+              placeholder="thiago@financas.ai"
+              required
+            />
+          </label>
+
+          <label>
+            Senha
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="123456"
+              required
+            />
+          </label>
+
+          <p class="feedback" id="auth-feedback" role="alert"></p>
+
+          <div class="auth-actions">
+            <button class="primary-button" type="submit">Entrar</button>
+            <button class="ghost-button" id="create-account-button" type="button">
+              Criar conta local
+            </button>
+          </div>
+
+          <div class="demo-access">
+            <span>Conta demo:</span>
+            <button id="use-demo-button" type="button">thiago@financas.ai / 123456</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="finance-app hidden" id="finance-app">
+        <aside class="sidebar">
+          <div class="sidebar-brand">
+            <div class="brand-mark">FA</div>
+            <div>
+              <strong>Finanças AI</strong>
+              <span>Administrador pessoal</span>
+            </div>
+          </div>
+
+          <nav class="nav-tabs" aria-label="Navegação principal">
+            <button class="nav-tab active" data-tab="dashboard" type="button">
+              <span>Dashboard</span>
+            </button>
+            <button class="nav-tab" data-tab="transactions" type="button">
+              <span>Extrato</span>
+            </button>
+            <button class="nav-tab" data-tab="add-expense" type="button">
+              <span>Adicionar gastos</span>
+            </button>
+          </nav>
+
+          <div class="sidebar-summary">
+            <span>Usuário conectado</span>
+            <strong id="current-user-label">Thiago</strong>
+          </div>
+        </aside>
+
+        <div class="content">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow">Visão geral</p>
+              <h2 id="page-title">Dashboard financeiro</h2>
+            </div>
+            <div class="topbar-actions">
+              <button class="ghost-button compact" id="theme-toggle-button" type="button">
+                Tema claro
+              </button>
+              <button class="ghost-button compact" id="export-button" type="button">
+                Exportar CSV
+              </button>
+              <button class="danger-button compact" id="logout-button" type="button">
+                Sair
+              </button>
+            </div>
+          </header>
+
+          <section class="tab-panel active" id="dashboard-panel">
+            <div class="metric-grid">
+              <article class="metric-card balance-card">
+                <span>Saldo atual</span>
+                <strong id="current-balance">R$ 0,00</strong>
+                <small>Entradas e gastos já realizados</small>
+              </article>
+              <article class="metric-card">
+                <span>Entradas do mês</span>
+                <strong id="month-income">R$ 0,00</strong>
+                <small>Receitas confirmadas</small>
+              </article>
+              <article class="metric-card">
+                <span>Gastos do mês</span>
+                <strong id="month-expense">R$ 0,00</strong>
+                <small>Pagos e previstos no mês</small>
+              </article>
+              <article class="metric-card">
+                <span>Saldo projetado</span>
+                <strong id="projected-balance">R$ 0,00</strong>
+                <small>Considerando lançamentos futuros</small>
+              </article>
+            </div>
+
+            <div class="dashboard-grid">
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <p class="eyebrow">Próximos compromissos</p>
+                    <h3>Gastos futuros</h3>
+                  </div>
+                </div>
+                <div class="upcoming-list" id="upcoming-list"></div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <p class="eyebrow">Categorias</p>
+                    <h3>Distribuição dos gastos</h3>
+                  </div>
+                </div>
+                <div class="category-list" id="category-list"></div>
+              </article>
+            </div>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">Atividade recente</p>
+                  <h3>Últimos lançamentos</h3>
+                </div>
+                <button class="text-button" data-go-tab="transactions" type="button">
+                  Ver extrato completo
+                </button>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Descrição</th>
+                      <th>Categoria</th>
+                      <th>Status</th>
+                      <th>Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recent-transactions"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <section class="tab-panel" id="transactions-panel">
+            <article class="panel">
+              <div class="panel-header split">
+                <div>
+                  <p class="eyebrow">Extrato</p>
+                  <h3>Todos os lançamentos</h3>
+                </div>
+                <div class="filters">
+                  <select id="filter-type" aria-label="Filtrar por tipo">
+                    <option value="all">Todos os tipos</option>
+                    <option value="income">Entradas</option>
+                    <option value="expense">Gastos</option>
+                  </select>
+                  <select id="filter-status" aria-label="Filtrar por status">
+                    <option value="all">Todos os status</option>
+                    <option value="paid">Realizados</option>
+                    <option value="planned">Futuros</option>
+                  </select>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Descrição</th>
+                      <th>Tipo</th>
+                      <th>Categoria</th>
+                      <th>Status</th>
+                      <th>Valor</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactions-table"></tbody>
+                </table>
+              </div>
+              <div class="empty-state hidden" id="empty-transactions">
+                <strong>Nenhum lançamento encontrado</strong>
+                <span>Adicione gastos, entradas ou ajuste os filtros.</span>
+              </div>
+            </article>
+          </section>
+
+          <section class="tab-panel" id="add-expense-panel">
+            <div class="form-grid">
+              <form class="panel transaction-form" id="transaction-form">
+                <div>
+                  <p class="eyebrow">Novo lançamento</p>
+                  <h3>Adicionar gasto ou entrada</h3>
+                  <p class="muted">
+                    Cadastre o que já aconteceu ou um compromisso financeiro futuro.
+                  </p>
+                </div>
+
+                <div class="field-row">
+                  <label>
+                    Tipo
+                    <select id="transaction-type" required>
+                      <option value="expense">Gasto</option>
+                      <option value="income">Entrada</option>
+                    </select>
+                  </label>
+                  <label>
+                    Status
+                    <select id="transaction-status" required>
+                      <option value="paid">Já aconteceu</option>
+                      <option value="planned">Vai acontecer</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label>
+                  Descrição
+                  <input
+                    id="transaction-description"
+                    type="text"
+                    placeholder="Ex.: Mercado, aluguel, salário..."
+                    required
+                  />
+                </label>
+
+                <div class="field-row">
+                  <label>
+                    Valor
+                    <input
+                      id="transaction-amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0,00"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Data
+                    <input id="transaction-date" type="date" required />
+                  </label>
+                </div>
+
+                <label>
+                  Categoria
+                  <select id="transaction-category" required>
+                    <option value="Moradia">Moradia</option>
+                    <option value="Alimentação">Alimentação</option>
+                    <option value="Transporte">Transporte</option>
+                    <option value="Saúde">Saúde</option>
+                    <option value="Educação">Educação</option>
+                    <option value="Lazer">Lazer</option>
+                    <option value="Trabalho">Trabalho</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </label>
+
+                <label>
+                  Observação
+                  <textarea
+                    id="transaction-notes"
+                    rows="3"
+                    placeholder="Opcional: detalhes, parcelas, vencimento..."
+                  ></textarea>
+                </label>
+
+                <p class="feedback success" id="transaction-feedback" role="status"></p>
+
+                <button class="primary-button" type="submit">Salvar lançamento</button>
+              </form>
+
+              <aside class="panel tips-panel">
+                <p class="eyebrow">Como usar</p>
+                <h3>Fluxo simples</h3>
+                <ul>
+                  <li>Use <strong>Já aconteceu</strong> para movimentar o saldo atual.</li>
+                  <li>Use <strong>Vai acontecer</strong> para prever contas futuras.</li>
+                  <li>Cadastre entradas para o saldo fazer sentido mês a mês.</li>
+                  <li>Exporte o CSV se quiser analisar em planilha depois.</li>
+                </ul>
+              </aside>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
